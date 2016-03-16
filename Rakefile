@@ -1,4 +1,3 @@
-require 'pry'
 SPACE = ' '
 namespace :create do
   desc 'Create bigrams lookup from Google Books'
