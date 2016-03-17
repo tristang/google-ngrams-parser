@@ -3,10 +3,9 @@ namespace :create do
   desc 'Create bigrams lookup from Google Books'
   task :google_bigrams do
     hash = Hash.new
-    parts_of_speech = %w(_ADJ_ _ADP_ _ADV_ _CONJ_ _DET_ _NOUN_ _NUM_ _PRON_ _PRT_ _VERB_)
-    trailing_parts_of_speech = %w(_ADJ _ADP _ADV _CONJ _DET _NOUN _NUM _PRON _PRT _VERB)
-    pos_indicators = Regexp.new(trailing_parts_of_speech.map{ |s| Regexp.escape(s) }.join("|") + "$")
 
+    pos_markers = %w(_ADJ _ADP _ADV _CONJ _DET _NOUN _NUM _PRON _PRT _VERB _X _START _END _.)
+    pos_indicators = Regexp.new(pos_markers.map{ |s| Regexp.escape(s) }.join("|"))
 
     letters = %w(a  b c d e f g h i j k l m n o p q r s t u v w x y z)
     letters.repeated_permutation(2).each do |ll|
@@ -26,18 +25,19 @@ namespace :create do
           # Convert to lowercase and break words
           left_word, right_word = words.split(SPACE)
 
-          # Not interested in POS for now
-          next if (parts_of_speech & [left_word, right_word]).any?
-
           # Remove POS annotations (mix different uses of words)
+          # This also mames all POS placeholders (eg: _ADV_) into "_"
           right_word.gsub!(pos_indicators, '')
           left_word.gsub!(pos_indicators, '')
+
+          # Forget anything with an underscore left in it
+          next if [left_word, right_word].any?{ |w| w =~ /_/ }
 
           # Forget about upper/lower (mix different uses of words more)
           left_word.downcase!
           right_word.downcase!
 
-          # Not interested in stand-alone punctuation
+          # Forget stand-alone punctuation
           next unless [left_word, right_word].all?{ |w| w =~ /[a-z]/ }
 
           hash[left_word.to_sym] ||= Hash.new(0)
