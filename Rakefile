@@ -10,15 +10,23 @@ namespace :create do
     letters = %w(a  b c d e f g h i j k l m n o p q r s t u v w x y z)
     letters.repeated_permutation(2).each do |ll|
       ll = ll.join
-      path = "originals/googlebooks-eng-all-2gram-20120701-#{ll}"
-      unless File.file?(path)
+      input_file = "originals/googlebooks-eng-all-2gram-20120701-#{ll}"
+      output_file = "marshal/google-bigrams-#{ll}.marshal"
+
+      # Skip if we've done ths file already
+      if File.file?(output_file)
+        puts "Already generated '#{ll}' file. Skipping."
+        next
+      end
+
+      unless File.file?(input_file)
         puts "No file found for '#{ll}'. Skipping."
         next
       else
         print "Creating bigrams from '#{ll}'..."
       end
 
-      File.open(path, "r") do |file_handle|
+      File.open(input_file, "r") do |file_handle|
         file_handle.each_line do |line|
           words, _year, count, _book_count = line.split("\t")
 
@@ -45,7 +53,7 @@ namespace :create do
         end  
       end
 
-      File.open("marshal/google-bigrams-#{ll}.marshal", "w") do |file|
+      File.open(output_file, "w") do |file|
         Marshal.dump(hash, file)
       end
 
