@@ -4,12 +4,12 @@ LETTERS = %w(a  b c d e f g h i j k l m n o p q r s t u v w x y z)
 
 namespace :bigrams do
   desc 'Download gzipped bigram data files from Google Books'
-  task :maintain_one_input_file do
+  task :maintain_input_files do
     operation_completed = false
     until operation_completed do
       operation_completed = true
-      current_count = Dir[File.join('originals', '**', '*')].count { |file| File.file?(file) && file =~ /googlebooks-eng-all-2gram-20120701-[a-z][a-z]$/ }
-      if current_count >= 1
+      current_count = Dir[File.join('originals', '**', '*')].count { |file| file =~ /googlebooks-eng-all-2gram-20120701-[a-z][a-z]/ }
+      if current_count >= 10
         puts "There are already #{current_count} downloaded files. Waiting..."
         operation_completed = false
         sleep 5
@@ -24,7 +24,7 @@ namespace :bigrams do
         if File.file?(output_file_path) 
           puts "Already procesed #{ll}. Skipping."
           next
-        elsif File.file?(input_file_path)
+        elsif Dir[File.join('originals', '**', '*')].count { |file| file =~ /googlebooks-eng-all-2gram-20120701-#{ll}/ } > 0
           puts "Already downloaded #{ll}. Skipping."
           next
         else
@@ -37,14 +37,16 @@ namespace :bigrams do
           puts `gunzip #{input_file_path}`
 
           operation_completed = false
+          break
         end
       end
-      puts "Downloading is complete. All files process or downloaded."
     end
+    puts "Downloading is complete. All files process or downloaded."
   end
 
   desc 'Create bigrams lookup from Google Books'
-  task :create do
+  task :create do |t, args|
+
     hash = Hash.new
 
     pos_markers = %w(_ADJ _ADP _ADV _CONJ _DET _NOUN _NUM _PRON _PRT _VERB _X _START _END _.)
@@ -53,6 +55,10 @@ namespace :bigrams do
     operation_completed = false
 
     until operation_completed do
+      if Dir[File.join('originals', '**', '*')].count { |file| file =~ /googlebooks-eng-all-2gram-20120701-[a-z][a-z]$/ } == 0
+        puts "Waiting for an input file... try again in 20 seconds."
+        sleep 20
+      end
 
       operation_completed = true
 
@@ -63,22 +69,29 @@ namespace :bigrams do
 
         # Skip if we've done ths file already
         if File.file?(output_file_path)
-          puts "Already generated '#{ll}' file. Skipping."
+          puts "Already generated '#{ll}.marshal'. Skipping."
           next
         else
           operation_completed = false
         end
 
-        unless File.file?(input_file)
+        if File.file?(input_file)
+          if File.file?(input_file+'gz')
+            puts "Waiting for #{input_file}.gz to complete"
+            next
+          end
+          puts "Creating bigrams from '#{ll}'..."
+          claimed_input_file = input_file+".taken"
+          # Rename the file to claim it
+          File.rename(input_file, claimed_input_file)
+        else
           puts "No input file found for '#{ll}'. Skipping."
           next
-        else
-          puts "Creating bigrams from '#{ll}'..."
         end
 
-        line_count = `wc -l "#{input_file}"`.strip.split(' ')[0].to_i
+        line_count = `wc -l "#{claimed_input_file}"`.strip.split(' ')[0].to_i
 
-        File.open(input_file, "r") do |file_handle|
+        File.open(claimed_input_file, "r") do |file_handle|
           file_handle.each_line do |line|
             if file_handle.lineno % 100000 == 0
               puts "#{file_handle.lineno} lines processed (#{(file_handle.lineno / line_count.to_f * 100).round(2)}%)."
@@ -114,8 +127,8 @@ namespace :bigrams do
         end
 
         print " done."
-        File.delete(input_file)
-        puts "Deleted: #{input_file}"
+        File.delete(claimed_input_file)
+        puts "Deleted: #{claimed_input_file}"
       end
     end
     puts "All Marshal files complete!"
