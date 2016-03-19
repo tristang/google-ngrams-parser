@@ -111,7 +111,7 @@ namespace :bigrams do
         end
 
         if File.file?(input_file)
-          if File.file?(input_file+'gz')
+          if File.file?(input_file+'.gz')
             puts "Waiting for #{input_file}.gz to complete"
             next
           end
