@@ -9,7 +9,7 @@ namespace :bigrams do
     until operation_completed do
       operation_completed = true
       current_count = Dir[File.join('originals', '**', '*')].count { |file| file =~ /googlebooks-eng-all-2gram-20120701-[a-z][a-z]/ }
-      if current_count >= 10
+      if current_count >= 4
         puts "There are already #{current_count} downloaded files. Waiting..."
         operation_completed = false
         sleep 5
@@ -46,8 +46,6 @@ namespace :bigrams do
 
   desc 'Create bigrams lookup from Google Books'
   task :create do |t, args|
-
-    hash = Hash.new
 
     pos_markers = %w(_ADJ _ADP _ADV _CONJ _DET _NOUN _NUM _PRON _PRT _VERB _X _START _END _.)
     pos_indicators = Regexp.new(pos_markers.map{ |s| Regexp.escape(s) }.join("|"))
@@ -88,6 +86,8 @@ namespace :bigrams do
           puts "No input file found for '#{ll}'. Skipping."
           next
         end
+
+        hash = Hash.new
 
         line_count = `wc -l "#{claimed_input_file}"`.strip.split(' ')[0].to_i
 
