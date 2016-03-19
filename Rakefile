@@ -1,8 +1,32 @@
+require 'pry'
 SPACE = ' '
-LETTERS = %w(a  b c d e f g h i j k l m n o p q r s t u v w x y z)
-
+LETTERS = %w(a b c d e f g h i j k l m n o p q r s t u v w x y z)
+LETTER_PAIRS = LETTERS.repeated_permutation(2).map(&:join)
 
 namespace :bigrams do
+  desc "Remove bigrams from files where they don't belong. Fix my mistakes."
+  task :clean_marshal do
+    LETTER_PAIRS.each do |ll|
+      output_file_path = "marshal/google-bigrams-#{ll}.marshal"
+      next unless File.file?(output_file_path)
+      puts "Cleaning #{output_file_path}"
+      h = File.open(output_file_path, 'r') do |file|
+        Marshal.load(file)
+      end
+
+      count = h.length
+      # Exclude anything not stating with `ll`
+      h.delete_if{|k,v| !(k.to_s =~ Regexp.new("^"+ll)) }
+
+      puts "#{count - h.length} bigrams removed"
+      puts "#{h.length} bigrams retained"
+      File.open(output_file_path.gsub('.marshal', '.clean.marshal'), "w") do |file|
+        Marshal.dump(h, file)
+      end
+      puts "-------"
+    end
+  end
+
   desc 'Download gzipped bigram data files from Google Books'
   task :maintain_input_files do
     operation_completed = false
