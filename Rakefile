@@ -16,7 +16,7 @@ namespace :bigrams do
 
       count = h.length
       # Exclude anything not stating with `ll`
-      h.delete_if{|k,v| !(k.to_s =~ Regexp.new("^"+ll)) }
+      h.delete_if{|k,v| !(k.to_s =~ Regexp.new("^[^a-z]*"+ll[0]+"[^a-z]*"+ll[1])) }
 
       puts "#{count - h.length} bigrams removed"
       puts "#{h.length} bigrams retained"
