@@ -1,4 +1,5 @@
 require 'daybreak'
+require 'leveldb'
 SPACE = ' '
 LETTERS = %w(a b c d e f g h i j k l m n o p q r s t u v w x y z)
 LETTER_PAIRS = LETTERS.repeated_permutation(2).map(&:join)
@@ -205,5 +206,50 @@ namespace :bigrams do
       print "Loading in #{db_path}..."
       databases[ll] = Daybreak::DB.new db_path
     end
+  end
+
+  desc 'Store bigrams in leveldb'
+  task :store_in_leveldb do
+    output_file_path = "joined.marshal"
+    bigrams = File.open(output_file_path, "r") { |file| Marshal.load(file) }
+
+    db_path = "db/bigrams-leveldb.db"
+    print "Storing in #{db_path}..."
+    db = LevelDB::DB.new db_path
+
+    total = bigrams.length
+    i = 0
+    bigrams.each do |word1, hash|
+      hash.each do |word2, count|
+        key = [word1, word2].join("_")
+        db[key] = count.to_s
+      end
+      i += 1
+      puts "#{(i / total.to_f * 100).round(2)}% done"
+    end
+    puts 'finished.'
+  end
+  desc 'Store bigrams totals in leveldb'
+  task :store_totals_in_leveldb do
+    output_file_path = "joined.marshal"
+    bigrams = File.open(output_file_path, "r") { |file| Marshal.load(file) }
+
+    db_path = "db/bigrams-leveldb.db"
+    print "Storing in #{db_path}..."
+    db = LevelDB::DB.new db_path
+
+    total = bigrams.length
+    i = 0
+    total_count = 0
+    bigrams.each do |word1, hash|
+      word_count = hash.values.inject(:+)
+      total_count += word_count
+      db["#{word1}__total"] = word_count.to_s
+
+      i += 1
+      puts "#{(i / total.to_f * 100).round(2)}% done" if i % 100 == 0
+    end
+    db["__total"] = total_count.to_s
+    puts 'finished.'
   end
 end
