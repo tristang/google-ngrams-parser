@@ -1,7 +1,22 @@
 require 'leveldb'
 SPACE = ' '
 LETTERS = %w(a b c d e f g h i j k l m n o p q r s t u v w x y z)
+
+# Files are broken up by first two letters of first word
 LETTER_PAIRS = LETTERS.repeated_permutation(2).map(&:join)
+
+# http://storage.googleapis.com/books/ngrams/books/datasetsv2.html
+# > "Files with a letter followed by an underscore (e.g., s_) contain
+# > ngrams that begin with the first letter, but have an unusual second
+# > character.
+
+# I think this includes single letter words like "a" and "I"
+SINGLE_LETTERS = LETTERS.map{ |letter| "#{letter}_" }
+
+INPUT_FILENAMES = (LETTER_PAIRS + SINGLE_LETTERS).map do |key|
+  "googlebooks-eng-all-2gram-20120701-#{key}.gz"
+end
+
 
 namespace :bigrams do
   desc 'Download gzipped bigram data files from Google Books'
