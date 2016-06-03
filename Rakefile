@@ -1,4 +1,3 @@
-require 'daybreak'
 require 'leveldb'
 SPACE = ' '
 LETTERS = %w(a b c d e f g h i j k l m n o p q r s t u v w x y z)
@@ -171,41 +170,6 @@ namespace :bigrams do
       end
     end
     puts "All Marshal files complete!"
-  end
-
-  desc 'Store bigrams in DayBreak'
-  task :store_in_daybreak do
-
-    LETTER_PAIRS.each do |ll|
-      output_file_path = "marshal/google-bigrams-#{ll}.marshal"
-      unless File.file?(output_file_path)
-        puts "Skipping #{ll}. Marshal file not found."
-      end
-      bigrams = File.open(output_file_path, "r") { |file| Marshal.load(file) }
-
-      db_path = "db/bigrams-#{ll}.db"
-      db = Daybreak::DB.new db_path
-      print "Storing in #{db_path}..."
-      bigrams.each do |word1, hash|
-        hash.each do |word2, count|
-          key = [word1, word2].join("_")
-          db[key] = count
-        end
-      end
-      puts 'done.'
-      db.flush
-      db.close
-    end
-  end
-
-  desc 'Load bigrams with DayBreak'
-  task :load_daybreak do
-    databases = {}
-    LETTER_PAIRS.each do |ll|
-      db_path = "db/bigrams-#{ll}.db"
-      print "Loading in #{db_path}..."
-      databases[ll] = Daybreak::DB.new db_path
-    end
   end
 
   desc 'Store bigrams in leveldb'
