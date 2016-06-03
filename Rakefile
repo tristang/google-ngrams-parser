@@ -1,4 +1,5 @@
 require 'leveldb'
+require 'pry'
 SPACE = ' '
 LETTERS = %w(a b c d e f g h i j k l m n o p q r s t u v w x y z)
 
@@ -13,141 +14,98 @@ LETTER_PAIRS = LETTERS.repeated_permutation(2).map(&:join)
 # I think this includes single letter words like "a" and "I"
 SINGLE_LETTERS = LETTERS.map{ |letter| "#{letter}_" }
 
-INPUT_FILENAMES = (LETTER_PAIRS + SINGLE_LETTERS).map do |key|
-  "googlebooks-eng-all-2gram-20120701-#{key}.gz"
+FILES_TO_PARSE = (LETTER_PAIRS + SINGLE_LETTERS).map do |key|
+  hash = {}
+  hash[:key] = key
+  hash[:filename] = "googlebooks-eng-all-2gram-20120701-#{key}"
+  hash[:gzipped_filename] = "#{hash[:filename]}.gz"
+
+  hash[:remote_gzipped_file_path] = "http://storage.googleapis.com/books/ngrams/books/#{hash[:gzipped_filename]}"
+
+  hash[:local_file_path] = "input/#{hash[:filename]}"
+  hash[:local_gzipped_file_path] = "input/#{hash[:gzipped_filename]}"
+
+  # Marker files for running multiple instances
+  hash[:started_marker_file] = "output/started/#{key}"
+  hash[:complete_marker_file] = "output/complete/#{key}"
+
+  hash
 end
 
+# Files contain POS tagged words, as well as POS counts:
+# Eg:
+# red_ADJ hat_NOUN ...
+# red_ADJ _NOUN_ ...
+POS_MARKERS = %w(_ADJ _ADP _ADV _CONJ _DET _NOUN _NUM _PRON _PRT _VERB _X _START _END _.)
+POS_MARKERS_REGEXP = Regexp.new(POS_MARKERS.map{ |s| Regexp.escape(s) }.join("|"))
 
 namespace :bigrams do
-  desc 'Download gzipped bigram data files from Google Books'
-  task :maintain_input_files do
-    operation_completed = false
-    until operation_completed do
-      operation_completed = true
-      current_count = Dir[File.join('originals', '**', '*')].count { |file| file =~ /googlebooks-eng-all-2gram-20120701-[a-z][a-z]/ }
-      if current_count >= 4
-        puts "There are already #{current_count} downloaded files. Waiting..."
-        operation_completed = false
-        sleep 5
-        next
-      end
-      LETTERS.repeated_permutation(2).each do |ll|
-        ll = ll.join
-        output_file_path = "marshal/google-bigrams-#{ll}.marshal"
-        input_file_name = "googlebooks-eng-all-2gram-20120701-#{ll}.gz"
-        input_file_path = "originals/#{input_file_name}"
-
-        if File.file?(output_file_path) 
-          puts "Already procesed #{ll}. Skipping."
-          next
-        elsif Dir[File.join('originals', '**', '*')].count { |file| file =~ /googlebooks-eng-all-2gram-20120701-#{ll}/ } > 0
-          puts "Already downloaded #{ll}. Skipping."
-          next
-        else
-          path = "http://storage.googleapis.com/books/ngrams/books/#{input_file_name}"
-          puts "Downloading #{path}"
-          # Download (with -nc just in case)
-          
-          puts `wget -nc -O #{input_file_path} #{path}`
-          # Unzip
-          puts `gunzip #{input_file_path}`
-
-          operation_completed = false
-          break
-        end
-      end
-    end
-    puts "Downloading is complete. All files process or downloaded."
+  task :pry do
+    binding.pry
   end
 
   desc 'Create bigrams lookup from Google Books'
-  task :create do |t, args|
+  task :create do
+    FILES_TO_PARSE do |file|
+      # Skip past started files
+      next if File.file?(file[:started_marker_file])
 
-    pos_markers = %w(_ADJ _ADP _ADV _CONJ _DET _NOUN _NUM _PRON _PRT _VERB _X _START _END _.)
-    pos_indicators = Regexp.new(pos_markers.map{ |s| Regexp.escape(s) }.join("|"))
+      puts "Starting on '#{file[:key]}'..."
 
-    operation_completed = false
+      # Mark the file as started
+      File.write(file[:started_marker_file], Time.now.to_s)
 
-    until operation_completed do
-      if Dir[File.join('originals', '**', '*')].count { |file| file =~ /googlebooks-eng-all-2gram-20120701-[a-z][a-z]$/ } == 0
-        puts "Waiting for an input file... try again in 20 seconds."
-        sleep 20
-      end
+      # Download the file from Google
+      puts `wget -nc -O #{file[:local_gzipped_file_path]} #{file[:remote_gzipped_file_path]}`
 
-      operation_completed = true
+      # Unzip the file. Gzipped version is automatically removed.
+      puts `gunzip #{file[:local_gzipped_file_path]} > #{file[:local_file_path]}`
 
-      LETTERS.repeated_permutation(2).each do |ll|
-        ll = ll.join
-        input_file = "originals/googlebooks-eng-all-2gram-20120701-#{ll}"
-        output_file_path = "marshal/google-bigrams-#{ll}.marshal"
+      hash = Hash.new
 
-        # Skip if we've done ths file already
-        if File.file?(output_file_path)
-          puts "Already generated '#{ll}.marshal'. Skipping."
-          next
-        else
-          operation_completed = false
-        end
+      line_count = `wc -l "#{claimed_input_file}"`.strip.split(' ')[0].to_i
 
-        if File.file?(input_file)
-          if File.file?(input_file+'.gz')
-            puts "Waiting for #{input_file}.gz to complete"
-            next
+      File.open(claimed_input_file, "r") do |file_handle|
+        file_handle.each_line do |line|
+          if file_handle.lineno % 100000 == 0
+            puts "#{file_handle.lineno} lines processed (#{(file_handle.lineno / line_count.to_f * 100).round(2)}%)."
           end
-          puts "Creating bigrams from '#{ll}'..."
-          claimed_input_file = input_file+".taken"
-          # Rename the file to claim it
-          File.rename(input_file, claimed_input_file)
-        else
-          puts "No input file found for '#{ll}'. Skipping."
-          next
-        end
 
-        hash = Hash.new
+          words, _year, count, _book_count = line.split("\t")
 
-        line_count = `wc -l "#{claimed_input_file}"`.strip.split(' ')[0].to_i
+          # Convert to lowercase and break words
+          left_word, right_word = words.split(SPACE)
 
-        File.open(claimed_input_file, "r") do |file_handle|
-          file_handle.each_line do |line|
-            if file_handle.lineno % 100000 == 0
-              puts "#{file_handle.lineno} lines processed (#{(file_handle.lineno / line_count.to_f * 100).round(2)}%)."
-            end
+          # Remove POS annotations (mix different uses of words)
+          # This also mames all POS placeholders (eg: _ADV_) into "_"
+          right_word.gsub!(POS_MARKERS_REGEXP, '')
+          left_word.gsub!(POS_MARKERS_REGEXP, '')
 
-            words, _year, count, _book_count = line.split("\t")
+          # Forget anything with an underscore left in it
+          next if [left_word, right_word].any?{ |w| w =~ /_/ }
 
-            # Convert to lowercase and break words
-            left_word, right_word = words.split(SPACE)
+          # Forget about upper/lower (mix different uses of words more)
+          left_word.downcase!
+          right_word.downcase!
 
-            # Remove POS annotations (mix different uses of words)
-            # This also mames all POS placeholders (eg: _ADV_) into "_"
-            right_word.gsub!(pos_indicators, '')
-            left_word.gsub!(pos_indicators, '')
+          # Forget stand-alone punctuation
+          next unless [left_word, right_word].all?{ |w| w =~ /[a-z]/ }
 
-            # Forget anything with an underscore left in it
-            next if [left_word, right_word].any?{ |w| w =~ /_/ }
-
-            # Forget about upper/lower (mix different uses of words more)
-            left_word.downcase!
-            right_word.downcase!
-
-            # Forget stand-alone punctuation
-            next unless [left_word, right_word].all?{ |w| w =~ /[a-z]/ }
-
-            hash[left_word.to_sym] ||= Hash.new(0)
-            hash[left_word.to_sym][right_word.to_sym] += count.to_i
-          end  
-        end
-
-        File.open(output_file_path, "w") do |file|
-          Marshal.dump(hash, file)
-        end
-
-        print " done."
-        File.delete(claimed_input_file)
-        puts "Deleted: #{claimed_input_file}"
+          hash[left_word.to_sym] ||= Hash.new(0)
+          hash[left_word.to_sym][right_word.to_sym] += count.to_i
+        end  
       end
+
+      # TODO: Store counts in LevelDB
+
+      # Mark the file as completed
+      File.write(file[:complete_marker_file], Time.now.to_s)
+
+      # Delete the unzipped file
+      File.delete(file[:local_file_path])
+
+      print " done."
     end
-    puts "All Marshal files complete!"
   end
 
   desc 'Store bigrams in leveldb'
