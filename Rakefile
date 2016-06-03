@@ -4,43 +4,6 @@ LETTERS = %w(a b c d e f g h i j k l m n o p q r s t u v w x y z)
 LETTER_PAIRS = LETTERS.repeated_permutation(2).map(&:join)
 
 namespace :bigrams do
-  task :remove_dirty do
-    LETTER_PAIRS.each do |ll|
-      output_file_path = "marshal/google-bigrams-#{ll}.marshal"
-      cleaned_output_file_path = "marshal/google-bigrams-#{ll}.clean.marshal"
-      
-      if File.file?(output_file_path) && File.file?(cleaned_output_file_path)
-        puts "Deleting #{output_file_path}"
-        File.delete(output_file_path)
-      end
-    end
-  end
-  desc "Remove bigrams from files where they don't belong. Fix my mistakes."
-  task :clean_marshal do
-    LETTER_PAIRS.each do |ll|
-      output_file_path = "marshal/google-bigrams-#{ll}.marshal"
-      cleaned_output_file_path = "marshal/google-bigrams-#{ll}.clean.marshal"
-      next unless File.file?(output_file_path)
-      next if File.file?(cleaned_output_file_path)
-
-      puts "Cleaning #{output_file_path}"
-      h = File.open(output_file_path, 'r') do |file|
-        Marshal.load(file)
-      end
-
-      count = h.length
-      # Exclude anything not stating with `ll`
-      h.delete_if{|k,v| !(k.to_s =~ Regexp.new("^[^a-z]*"+ll[0]+"[^a-z]*"+ll[1])) }
-
-      puts "#{count - h.length} bigrams removed"
-      puts "#{h.length} bigrams retained"
-      File.open(cleaned_output_file_path, "w") do |file|
-        Marshal.dump(h, file)
-      end
-      puts "-------"
-    end
-  end
-
   desc 'Download gzipped bigram data files from Google Books'
   task :maintain_input_files do
     operation_completed = false
