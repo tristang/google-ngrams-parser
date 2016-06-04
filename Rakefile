@@ -23,8 +23,9 @@ FILES_TO_PARSE = (LETTER_PAIRS + SINGLE_LETTERS).map do |key|
 
   hash[:remote_gzipped_file_path] = "http://storage.googleapis.com/books/ngrams/books/#{hash[:gzipped_filename]}"
 
-  hash[:local_file_path] = "input/#{hash[:filename]}"
   hash[:local_gzipped_file_path] = "input/#{hash[:gzipped_filename]}"
+  # Note: this is the path produced by `gunzip` with no arguments
+  hash[:local_file_path] = "input/#{hash[:filename]}"
 
   # Marker files for running multiple instances
   hash[:started_marker_file] = "output/started/#{key}"
@@ -55,8 +56,10 @@ namespace :bigrams do
       # Download the file from Google
       puts `wget -nc -O #{file[:local_gzipped_file_path]} #{file[:remote_gzipped_file_path]}`
 
-      # Unzip the file. Gzipped version is automatically removed.
-      puts `gunzip #{file[:local_gzipped_file_path]} > #{file[:local_file_path]}`
+      # Unzip the file. 
+      # This will result in a file at file[:local_file_path].
+      # Gzipped version is automatically removed.
+      puts `gunzip #{file[:local_gzipped_file_path]}`
 
       processed_data = Hash.new
 
