@@ -65,7 +65,7 @@ namespace :bigrams do
       puts `gunzip #{file[:local_gzipped_file_path]}`
 
       # Remove all lines with underscores
-      puts `sed -i '/_/d' #{file[:local_gzipped_file_path]}`
+      puts `sed -i '/_/d' #{file[:local_file_path]}`
 
       processed_data = Hash.new
 
