@@ -69,6 +69,11 @@ namespace :bigrams do
 
           words, year, ngram_count, volume_count = line.split("\t")
 
+          # Convert counts and year to integers
+          ngram_count = ngram_count.to_i
+          volume_count = volume_count.to_i
+          year = year.to_i
+
           next if year.to_i < MINIMUM_YEAR
 
           # Convert to lowercase and break words
@@ -91,8 +96,8 @@ namespace :bigrams do
 
           processed_data[left_word.to_sym] ||= Hash.new(0)
           processed_data[left_word.to_sym][right_word.to_sym] ||= Hash.new(0)
-          processed_data[left_word.to_sym][right_word.to_sym][:match_count] += ngram_count.to_i
-          processed_data[left_word.to_sym][right_word.to_sym][:volumn_count] += volume_count.to_i
+          processed_data[left_word.to_sym][right_word.to_sym][:match_count] += ngram_count
+          processed_data[left_word.to_sym][right_word.to_sym][:volumn_count] += volume_count
         end  
       end
 
