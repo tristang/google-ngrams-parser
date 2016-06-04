@@ -64,6 +64,9 @@ namespace :bigrams do
       # Gzipped version is automatically removed.
       puts `gunzip #{file[:local_gzipped_file_path]}`
 
+      # Remove all lines with underscores
+      puts `sed -i '/_/d' #{file[:local_gzipped_file_path]}`
+
       processed_data = Hash.new
 
       line_count = `wc -l "#{file[:local_file_path]}"`.strip.split(SPACE)[0].to_i
