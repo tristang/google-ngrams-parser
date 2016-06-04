@@ -1,5 +1,3 @@
-require 'leveldb'
-require 'pry'
 SPACE = ' '
 LETTERS = %w(a b c d e f g h i j k l m n o p q r s t u v w x y z)
 
@@ -43,10 +41,6 @@ POS_MARKERS = %w(_ADJ _ADP _ADV _CONJ _DET _NOUN _NUM _PRON _PRT _VERB _X _START
 POS_MARKERS_REGEXP = Regexp.new(POS_MARKERS.map{ |s| Regexp.escape(s) }.join("|"))
 
 namespace :bigrams do
-  task :pry do
-    binding.pry
-  end
-
   desc 'Create bigrams lookup from Google Books'
   task :create do
     FILES_TO_PARSE.each do |file|
@@ -66,9 +60,9 @@ namespace :bigrams do
 
       processed_data = Hash.new
 
-      line_count = `wc -l "#{claimed_input_file}"`.strip.split(SPACE)[0].to_i
+      line_count = `wc -l "#{file[:local_file_path]}"`.strip.split(SPACE)[0].to_i
 
-      File.open(claimed_input_file, "r") do |file_handle|
+      File.open(file[:local_file_path], "r") do |file_handle|
         file_handle.each_line do |line|
           # Print progress every 100,000 lines
           puts "#{file_handle.lineno} lines processed (#{(file_handle.lineno / line_count.to_f * 100).round(2)}%)." if file_handle.lineno % 100000 == 0
