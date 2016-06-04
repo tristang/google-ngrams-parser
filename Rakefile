@@ -6,12 +6,15 @@ LETTERS = %w(a b c d e f g h i j k l m n o p q r s t u v w x y z)
 # Files are broken up by first two letters of first word
 LETTER_PAIRS = LETTERS.repeated_permutation(2).map(&:join)
 
+# Ignore uses before this year.
+MINIMUM_YEAR = 1900
+
 # http://storage.googleapis.com/books/ngrams/books/datasetsv2.html
 # > "Files with a letter followed by an underscore (e.g., s_) contain
 # > ngrams that begin with the first letter, but have an unusual second
 # > character.
 
-# I think this includes single letter words like "a" and "I"
+# This includes single letter words like "a" and "I"
 SINGLE_LETTERS = LETTERS.map{ |letter| "#{letter}_" }
 
 FILES_TO_PARSE = (LETTER_PAIRS + SINGLE_LETTERS).map do |key|
@@ -72,7 +75,7 @@ namespace :bigrams do
 
           words, year, ngram_count, volume_count = line.split("\t")
 
-          words, _year, count, _book_count = line.split("\t")
+          next if year.to_i < MINIMUM_YEAR
 
           # Convert to lowercase and break words
           left_word, right_word = words.split(SPACE)
