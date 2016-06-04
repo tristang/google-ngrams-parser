@@ -1,3 +1,5 @@
+require 'pry'
+
 SPACE = ' '
 UNDERSCORE = '_'
 LETTERS = %w(a b c d e f g h i j k l m n o p q r s t u v w x y z)
@@ -45,6 +47,11 @@ end
 #POS_MARKERS_REGEXP = Regexp.new(POS_MARKERS.map{ |s| Regexp.escape(s) }.join("|"))
 
 namespace :bigrams do
+  desc 'Run a pry debugger'
+  task :pry do
+    binding.pry
+  end
+
   desc 'Create bigrams lookup from Google Books'
   task :create do
     FILES_TO_PARSE.each do |file|
