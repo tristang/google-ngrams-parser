@@ -94,10 +94,10 @@ namespace :bigrams do
           # Forget stand-alone punctuation
           next unless [left_word, right_word].all?{ |w| w =~ /[a-z]/ }
 
-          processed_data[left_word.to_sym] ||= Hash.new(0)
+          processed_data[left_word.to_sym] ||= Hash.new
           processed_data[left_word.to_sym][right_word.to_sym] ||= Hash.new(0)
           processed_data[left_word.to_sym][right_word.to_sym][:match_count] += ngram_count
-          processed_data[left_word.to_sym][right_word.to_sym][:volumn_count] += volume_count
+          processed_data[left_word.to_sym][right_word.to_sym][:volume_count] += volume_count
         end  
       end
 
