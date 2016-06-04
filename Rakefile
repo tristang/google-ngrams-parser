@@ -27,7 +27,7 @@ FILES_TO_PARSE = (LETTER_PAIRS + SINGLE_LETTERS).map do |key|
 
   # Marker files for running multiple instances
   hash[:started_marker_file] = "output/started/#{key}"
-  hash[:complete_marker_file] = "output/complete/#{key}"
+  hash[:output_file_path] = "output/complete/#{key}.marshal"
 
   hash
 end
@@ -61,15 +61,16 @@ namespace :bigrams do
       # Unzip the file. Gzipped version is automatically removed.
       puts `gunzip #{file[:local_gzipped_file_path]} > #{file[:local_file_path]}`
 
-      hash = Hash.new
+      processed_data = Hash.new
 
-      line_count = `wc -l "#{claimed_input_file}"`.strip.split(' ')[0].to_i
+      line_count = `wc -l "#{claimed_input_file}"`.strip.split(SPACE)[0].to_i
 
       File.open(claimed_input_file, "r") do |file_handle|
         file_handle.each_line do |line|
-          if file_handle.lineno % 100000 == 0
-            puts "#{file_handle.lineno} lines processed (#{(file_handle.lineno / line_count.to_f * 100).round(2)}%)."
-          end
+          # Print progress every 100,000 lines
+          puts "#{file_handle.lineno} lines processed (#{(file_handle.lineno / line_count.to_f * 100).round(2)}%)." if file_handle.lineno % 100000 == 0
+
+          words, year, ngram_count, volume_count = line.split("\t")
 
           words, _year, count, _book_count = line.split("\t")
 
@@ -91,20 +92,22 @@ namespace :bigrams do
           # Forget stand-alone punctuation
           next unless [left_word, right_word].all?{ |w| w =~ /[a-z]/ }
 
-          hash[left_word.to_sym] ||= Hash.new(0)
-          hash[left_word.to_sym][right_word.to_sym] += count.to_i
+          processed_data[left_word.to_sym] ||= Hash.new(0)
+          processed_data[left_word.to_sym][right_word.to_sym] ||= Hash.new(0)
+          processed_data[left_word.to_sym][right_word.to_sym][:match_count] += ngram_count.to_i
+          processed_data[left_word.to_sym][right_word.to_sym][:volumn_count] += volume_count.to_i
         end  
       end
 
-      # TODO: Store counts in LevelDB
-
-      # Mark the file as completed
-      File.write(file[:complete_marker_file], Time.now.to_s)
+      # Store the Marshaled processed data
+      File.open(file[:output_file_path], "w") do |f|
+        Marshal.dump(processed_data, f)
+      end
 
       # Delete the unzipped file
       File.delete(file[:local_file_path])
 
-      print " done."
+      print " done!"
     end
   end
 
