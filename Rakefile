@@ -34,12 +34,14 @@ FILES_TO_PARSE = (LETTER_PAIRS + SINGLE_LETTERS).map do |key|
   hash
 end
 
-# Files contain POS tagged words, as well as POS counts:
+# Files contain POS tagged words, untagged words (which appear to be the sum
+# of all differnt POS uses), as well as standalone POS tag counts:
 # Eg:
+# red_ADJ hat ...
 # red_ADJ hat_NOUN ...
 # red_ADJ _NOUN_ ...
-POS_MARKERS = %w(_ADJ _ADP _ADV _CONJ _DET _NOUN _NUM _PRON _PRT _VERB _X _START _END _.)
-POS_MARKERS_REGEXP = Regexp.new(POS_MARKERS.map{ |s| Regexp.escape(s) }.join("|"))
+#POS_MARKERS = %w(_ADJ _ADP _ADV _CONJ _DET _NOUN _NUM _PRON _PRT _VERB _X _START _END _.)
+#POS_MARKERS_REGEXP = Regexp.new(POS_MARKERS.map{ |s| Regexp.escape(s) }.join("|"))
 
 namespace :bigrams do
   desc 'Create bigrams lookup from Google Books'
@@ -68,9 +70,14 @@ namespace :bigrams do
       File.open(file[:local_file_path], "r") do |file_handle|
         file_handle.each_line do |line|
           # Print progress every 100,000 lines
-          puts "#{file_handle.lineno} lines processed (#{(file_handle.lineno / line_count.to_f * 100).round(2)}%)." if file_handle.lineno % 100000 == 0
+          puts "#{file_handle.lineno} lines of '#{file[:key]}' processed (#{(file_handle.lineno / line_count.to_f * 100).round(2)}%)." if file_handle.lineno % 100000 == 0
 
           words, year, ngram_count, volume_count = line.split("\t")
+
+          # Forget anything with an underscore left in it.
+          # This removes all POS tagged words and standalone
+          # POS tag bigrams.
+          next if words[UNDERSCORE]
 
           # Convert counts and year to integers
           ngram_count = ngram_count.to_i
@@ -79,24 +86,16 @@ namespace :bigrams do
 
           next if year.to_i < MINIMUM_YEAR
 
-          # Convert to lowercase and break words
+          # Downcase words (mixes different uses of words)
+          words.downcase!
+
+          # Break words
           left_word, right_word = words.split(SPACE)
-
-          # Remove POS annotations (mix different uses of words)
-          # This also mames all POS placeholders (eg: _ADV_) into "_"
-          right_word.gsub!(POS_MARKERS_REGEXP, '')
-          left_word.gsub!(POS_MARKERS_REGEXP, '')
-
-          # Forget anything with an underscore left in it
-          next if [left_word, right_word].any?{ |w| w =~ /_/ }
-
-          # Forget about upper/lower (mix different uses of words more)
-          left_word.downcase!
-          right_word.downcase!
 
           # Forget stand-alone punctuation
           next unless [left_word, right_word].all?{ |w| w =~ /[a-z]/ }
 
+          # Increment the counts
           processed_data[left_word.to_sym] ||= Hash.new
           processed_data[left_word.to_sym][right_word.to_sym] ||= Hash.new(0)
           processed_data[left_word.to_sym][right_word.to_sym][:match_count] += ngram_count
