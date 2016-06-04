@@ -49,7 +49,7 @@ namespace :bigrams do
 
   desc 'Create bigrams lookup from Google Books'
   task :create do
-    FILES_TO_PARSE do |file|
+    FILES_TO_PARSE.each do |file|
       # Skip past started files
       next if File.file?(file[:started_marker_file])
 
