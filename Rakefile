@@ -1,4 +1,5 @@
 require 'pry'
+require 'leveldb'
 
 SPACE = ' '
 UNDERSCORE = '_'
@@ -36,6 +37,8 @@ FILES_TO_PARSE = (LETTER_PAIRS + SINGLE_LETTERS).map do |key|
 
   hash
 end
+
+DB_PATH = "output/leveldb/bigrams.db"
 
 # Files contain POS tagged words, untagged words (which appear to be the sum
 # of all differnt POS uses), as well as standalone POS tag counts:
@@ -128,46 +131,32 @@ namespace :bigrams do
 
   desc 'Store bigrams in leveldb'
   task :store_in_leveldb do
-    output_file_path = "joined.marshal"
-    bigrams = File.open(output_file_path, "r") { |file| Marshal.load(file) }
+    puts "Storing in #{DB_PATH}..."
+    db = LevelDB::DB.new DB_PATH
 
-    db_path = "db/bigrams-leveldb.db"
-    print "Storing in #{db_path}..."
-    db = LevelDB::DB.new db_path
+    FILES_TO_PARSE.each_with_index do |file, index|
+      bigrams = File.open(file[:output_file_path], "r") { |f| Marshal.load(f) }
 
-    total = bigrams.length
-    i = 0
-    bigrams.each do |word1, hash|
-      hash.each do |word2, count|
-        key = [word1, word2].join("_")
-        db[key] = count.to_s
+      total = bigrams.length
+      i = 0
+      bigrams.each do |word1, second_words|
+        word1_count = 0
+        second_words.each do |word2, counts|
+          match_count = counts[:match_count]
+          # Tally up sum of all bigrams for word1
+          word1_count += match_count
+
+          # Store the bigram in levelDB
+          db[[word1, word2].join("_")] = match_count.to_s
+        end
+        # Store the total word1 count in levelDB
+        db["#{word1}__total"] = word1_count.to_s
+
+        i += 1
+        print "#{(i / total.to_f * 100).round(2)}% done     \r"
+        $stdout.flush
       end
-      i += 1
-      puts "#{(i / total.to_f * 100).round(2)}% done"
+      puts "Stored file #{index+1}/#{FILES_TO_PARSE.length} in levelDB."
     end
-    puts 'finished.'
-  end
-  desc 'Store bigrams totals in leveldb'
-  task :store_totals_in_leveldb do
-    output_file_path = "joined.marshal"
-    bigrams = File.open(output_file_path, "r") { |file| Marshal.load(file) }
-
-    db_path = "db/bigrams-leveldb.db"
-    print "Storing in #{db_path}..."
-    db = LevelDB::DB.new db_path
-
-    total = bigrams.length
-    i = 0
-    total_count = 0
-    bigrams.each do |word1, hash|
-      word_count = hash.values.inject(:+)
-      total_count += word_count
-      db["#{word1}__total"] = word_count.to_s
-
-      i += 1
-      puts "#{(i / total.to_f * 100).round(2)}% done" if i % 100 == 0
-    end
-    db["__total"] = total_count.to_s
-    puts 'finished.'
   end
 end
