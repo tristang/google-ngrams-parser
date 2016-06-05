@@ -134,6 +134,7 @@ namespace :bigrams do
     puts "Storing in #{DB_PATH}..."
     db = LevelDB::DB.new DB_PATH
 
+    total_word_count = 0
     FILES_TO_PARSE.each_with_index do |file, index|
       bigrams = File.open(file[:output_file_path], "r") { |f| Marshal.load(f) }
 
@@ -143,7 +144,7 @@ namespace :bigrams do
         word1_count = 0
         second_words.each do |word2, counts|
           match_count = counts[:match_count]
-          # Tally up sum of all bigrams for word1
+          # Tally sum of all bigrams for word1
           word1_count += match_count
 
           # Store the bigram in levelDB
@@ -152,11 +153,16 @@ namespace :bigrams do
         # Store the total word1 count in levelDB
         db["#{word1}__total"] = word1_count.to_s
 
+        # Tally up all bigrams
+        total_word_count += word1_count
+
         i += 1
-        print "#{(i / total.to_f * 100).round(2)}% done     \r"
+        print "#{(i / total.to_f * 100).round(2)}% done     \r" if i % 10 == 0
         $stdout.flush
       end
       puts "Stored file #{index+1}/#{FILES_TO_PARSE.length} in levelDB."
     end
+    db["__total"] = total_word_count.to_s
+    db.close()
   end
 end
