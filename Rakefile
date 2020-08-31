@@ -1,5 +1,6 @@
 require 'pry'
 require 'leveldb'
+require 'lexicon'
 
 SPACE = ' '
 UNDERSCORE = '_'
@@ -22,6 +23,7 @@ SINGLE_LETTERS = LETTERS.map{ |letter| "#{letter}_" }
 FILES_TO_PARSE = (LETTER_PAIRS + SINGLE_LETTERS).map do |key|
   hash = {}
   hash[:key] = key
+
   hash[:filename] = "googlebooks-eng-all-2gram-20120701-#{key}"
   hash[:gzipped_filename] = "#{hash[:filename]}.gz"
 
@@ -69,7 +71,7 @@ namespace :bigrams do
       # Download the file from Google
       puts `wget -nc -O #{file[:local_gzipped_file_path]} #{file[:remote_gzipped_file_path]}`
 
-      # Unzip the file. 
+      # Unzip the file.
       # This will result in a file at file[:local_file_path].
       # Gzipped version is automatically removed.
       puts `gunzip #{file[:local_gzipped_file_path]}`
@@ -114,7 +116,7 @@ namespace :bigrams do
           processed_data[left_word.to_sym][right_word.to_sym] ||= Hash.new(0)
           processed_data[left_word.to_sym][right_word.to_sym][:match_count] += ngram_count
           processed_data[left_word.to_sym][right_word.to_sym][:volume_count] += volume_count
-        end  
+        end
       end
 
       # Store the Marshaled processed data
@@ -164,5 +166,99 @@ namespace :bigrams do
     end
     db["__total"] = total_word_count.to_s
     db.close()
+  end
+
+  desc 'Store trimmed bigrams hash'
+  task :trimmed_hash do
+    puts "Storing in trimmed hash"
+    dictionary = Lexicon.new
+    hash = Hash.new { |h, left_word| h[left_word] = Hash.new }
+
+    total_word_count = 0
+    FILES_TO_PARSE.each_with_index do |file, index|
+      bigrams = File.open(file[:output_file_path], "r") { |f| Marshal.load(f) }
+
+      bigrams.each do |word1, second_words|
+        word1 = word1.to_s
+        # Skip non dictionary words
+        next unless dictionary.lookup_insensitive(word1)
+
+        word1_count = 0
+        second_words.each do |word2, counts|
+          word2 = word2.to_s
+          # Skip non dictionary words
+          next unless dictionary.lookup_insensitive(word2)
+
+          match_count = counts[:match_count]
+          # Tally sum of all bigrams for word1
+          word1_count += match_count
+
+          # Store the bigram in the master hash
+          hash[word1][word2] = match_count
+        end
+        # Store the total word1 count
+        hash[word1]["__total"] = word1_count
+
+        # Tally up all bigrams
+        total_word_count += word1_count
+      end
+      puts "Added file #{index+1}/#{FILES_TO_PARSE.length} (#{file[:key]}) to hash."
+    end
+    hash["__total"] = total_word_count.to_s
+    # remove the default before storing with Marshal
+    hash.default = nil
+    File.open("bigrams_trimmed-dict.hash", "w") do |f|
+      Marshal.dump(hash, f)
+    end
+    puts "Done"
+  end
+
+  desc "Download and unzup 1grams"
+  task :fetch_1grams do
+    data = Hash.new(0)
+
+    LETTERS.each do |letter|
+      filename = "googlebooks-eng-all-1gram-20120701-#{letter}"
+      gz_filename = "#{filename}.gz"
+
+      gz_remote_file_path = "http://storage.googleapis.com/books/ngrams/books/#{gz_filename}"
+
+      local_file_path = "1grams/#{filename}"
+      gz_local_file_path = "#{local_file_path}.gz"
+
+      # Download and unzip the file if required
+      if !File.exists?(local_file_path)
+        if !File.exists?(gz_local_file_path)
+          puts `wget -nc -O #{gz_local_file_path} #{gz_remote_file_path}`
+        end
+        puts `gunzip #{gz_local_file_path}`
+      end
+
+      line_count = `wc -l "#{local_file_path}"`.strip.split(SPACE)[0].to_i
+      File.open(local_file_path, "r") do |fh|
+        fh.each_line do |line|
+          # Print progress every 10,000 lines
+          puts "#{fh.lineno} lines of '#{letter}' processed (#{(fh.lineno / line_count.to_f * 100).round(2)}%)." if fh.lineno % 10_000 == 0
+
+          word, year, ngram_count, _volume_count = line.split("\t")
+
+          # Convert counts and year to integers
+          ngram_count = ngram_count.to_i
+          year = year.to_i
+
+          # Ignore old texts
+          next if year.to_i < MINIMUM_YEAR
+
+          # Add this year's count to the total
+          data[word] += ngram_count
+        end
+      end
+
+      # Delete the unzipped file
+      File.delete(local_file_path)
+    end
+    File.open("1grams/1grams.hash", "w") do |f|
+      Marshal.dump(data, f)
+    end
   end
 end

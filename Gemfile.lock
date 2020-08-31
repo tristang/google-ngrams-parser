@@ -1,14 +1,29 @@
+PATH
+  remote: ../lexicon
+  specs:
+    lexicon (0.0.0)
+      lemmatizer
+      linguistics
+      ruby-progressbar
+      rwordnet
+
 GEM
   remote: https://rubygems.org/
   specs:
     coderay (1.1.0)
+    lemmatizer (0.1.1)
     leveldb-ruby (0.15)
+    linguistics (2.1.0)
+      loggability (~> 0.11)
+    loggability (0.14.0)
     method_source (0.8.2)
     pry (0.10.3)
       coderay (~> 1.1.0)
       method_source (~> 0.8.1)
       slop (~> 3.4)
     rake (11.1.2)
+    ruby-progressbar (1.10.0)
+    rwordnet (2.0.0)
     slop (3.6.0)
 
 PLATFORMS
@@ -16,8 +31,9 @@ PLATFORMS
 
 DEPENDENCIES
   leveldb-ruby
+  lexicon!
   pry
   rake
 
 BUNDLED WITH
-   1.10.6
+   1.17.1
